@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "one-run-no-key"
+version = "0.1.0"
+description = "Score AI agent runs for likely failure from one run, with no answer key, using one JEV read."
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+dependencies = []
+
+[project.scripts]
+onerun = "onerun.cli:main"
+
+[tool.setuptools]
+packages = ["onerun"]

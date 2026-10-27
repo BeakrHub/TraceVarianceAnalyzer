@@ -1,0 +1,6 @@
+{"type": "thread.started", "thread_id": "example-codex-thread"}
+{"type": "turn.started"}
+{"type": "item.completed", "item": {"id": "item_0", "type": "reasoning", "text": "Hidden reasoning: never sent to JEV."}}
+{"type": "item.completed", "item": {"id": "item_1", "type": "command_execution", "command": "python3 -c \"print(2*12 + 3*1.35, 2*12+3*1.35 < 3*12)\"", "aggregated_output": "28.05 True\n", "exit_code": 0, "status": "completed"}}
+{"type": "item.completed", "item": {"id": "item_2", "type": "agent_message", "text": "Buy 2 boxes (20 pens, $24.00) and 3 single pens ($4.05): 23 pens for $28.05."}}
+{"type": "turn.completed", "usage": {"input_tokens": 5120, "cached_input_tokens": 4096, "output_tokens": 210, "reasoning_output_tokens": 64}}

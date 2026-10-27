@@ -1,0 +1,39 @@
+{
+  "about": "Headline numbers from the post 'One run, no answer key' (26 Oct 2026). Solvers at low effort. AUROC is computed only within each benchmark (real tasks) or within each generator family (generated tasks). JEV = jev-1.13.0 reading one finished run with the completed_grade question in onerun/jev.py; judge = gpt-6-sol at low effort with the prompt in onerun/judge.py.",
+  "disagreement_precision": {
+    "about": "Share of pairs with at least one wrong run, split by the judge's call.",
+    "rows": [
+      {"model": "GPT-5.5", "tasks": "147 real benchmark tasks", "when_disagree": 0.93, "when_agree": 0.08},
+      {"model": "Claude Opus 4.6", "tasks": "147 real benchmark tasks", "when_disagree": 0.94, "when_agree": 0.39},
+      {"model": "Claude Opus 5.5", "tasks": "312 real benchmark tasks", "when_disagree": 0.73, "when_agree": 0.22},
+      {"model": "Claude Opus 5.5", "tasks": "32 generated tasks", "when_disagree": 1.00, "when_agree": 0.49}
+    ]
+  },
+  "breaking_the_tie": {
+    "about": "AUROC for 'does this pair contain a wrong run?'. JEV reads only run A. Whole benchmarks held out.",
+    "rows": [
+      {"model": "GPT-5.5", "tasks": 142, "judge_all_pairs": 0.91, "jev_all_pairs": 0.72, "judge_agreeing_pairs": 0.50, "jev_agreeing_pairs": 0.65},
+      {"model": "GPT-5.6 Luna", "tasks": 141, "judge_all_pairs": 0.89, "jev_all_pairs": 0.68, "judge_agreeing_pairs": 0.50, "jev_agreeing_pairs": 0.72},
+      {"model": "Claude Opus 4.6", "tasks": 140, "judge_all_pairs": 0.72, "jev_all_pairs": 0.70, "judge_agreeing_pairs": 0.50, "jev_agreeing_pairs": 0.68},
+      {"model": "Claude Opus 5.5", "tasks": 312, "judge_all_pairs": 0.63, "jev_all_pairs": 0.69, "judge_agreeing_pairs": 0.50, "jev_agreeing_pairs": 0.64}
+    ],
+    "quiet_failures_opus55_real": {"failing_pairs": 98, "agreeing_failing_pairs": 57, "agreeing_pairs_with_both_runs_wrong": 47}
+  },
+  "signals_flip": {
+    "about": "Claude Opus 5.5, AUROC for 'did this run fail?': real benchmarks (within benchmark; trained rows out of fold with whole benchmarks held out) vs new generated tasks (within generator).",
+    "rows": [
+      {"signal": "Output tokens", "real": 0.60, "generated": 0.18},
+      {"signal": "Run time", "real": 0.60, "generated": 0.26},
+      {"signal": "Best trained classifier (cross-validation pick)", "real": 0.66, "generated": 0.34},
+      {"signal": "32-feature trained classifier", "real": 0.59, "generated": 0.30},
+      {"signal": "JEV, one read, no answer key", "real": 0.63, "generated": 0.69}
+    ],
+    "earlier_models_held_out_benchmarks": {"best_trained_one_run_classifier": {"GPT-5.5": 0.64, "GPT-5.6 Luna": 0.65, "Claude Opus 4.6": 0.53}, "plain_jev": {"GPT-5.5": 0.72, "GPT-5.6 Luna": 0.68, "Claude Opus 4.6": 0.70}}
+  },
+  "generated_test_bed": {
+    "about": "Synthetic causal-inference tasks with a planted effect (16,384 rows each); two confounding families plus randomized controls. GPT-6 Sol and GPT-6 Astra at high effort solved all 32 hard tasks blind.",
+    "opus55_low_hard_runs_wrong": "75 of 192", "opus55_low_control_runs_wrong": "0 of 96",
+    "jev_agreeing_pairs_within_family": 0.68, "judge_plus_jev_all_pairs_within_family": 0.88
+  },
+  "cost_per_unit_usd": {"jev_read": 0.00015, "judge_pair": 0.0054}
+}
