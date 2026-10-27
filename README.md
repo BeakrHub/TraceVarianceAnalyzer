@@ -30,7 +30,7 @@ Use the score to **rank** runs (review the riskiest first), not as a pass/fail c
 Python 3.9 or later, no dependencies. Installing is optional: from the repo folder, `python3 -m onerun <command>` works as is.
 
 ```bash
-git clone <this repo> && cd one-run-no-key
+git clone https://github.com/BeakrHub/one-run-no-key.git && cd one-run-no-key
 python3 -m pip install --upgrade pip   # macOS's built-in Python 3.9 ships a pip too old for -e
 python3 -m pip install -e .            # gives you the `onerun` command
 ```

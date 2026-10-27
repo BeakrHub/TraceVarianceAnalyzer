@@ -11,6 +11,9 @@ requires-python = ">=3.9"
 license = {text = "MIT"}
 dependencies = []
 
+[project.urls]
+Homepage = "https://github.com/BeakrHub/one-run-no-key"
+
 [project.scripts]
 onerun = "onerun.cli:main"
 
