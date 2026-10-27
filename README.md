@@ -1,4 +1,4 @@
-# one-run-no-key
+# Trace Variance Analyzer
 
 Find likely failures in AI agent runs from **one run**, with **no answer key**.
 
