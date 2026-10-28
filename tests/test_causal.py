@@ -7,7 +7,7 @@ import os
 import tempfile
 import unittest
 
-from onerun import causal, cli
+from trace_variance_analyzer import causal, cli
 
 try:
     import numpy  # noqa: F401

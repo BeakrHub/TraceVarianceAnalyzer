@@ -6,10 +6,10 @@ import os
 import tempfile
 import unittest
 
-from onerun import cli, jev, judge
-from onerun.ingest import detect_format, parse_claude, parse_codex_exec, parse_codex_rollout
-from onerun.metrics import auroc
-from onerun.state import BOUNDED_STATE_BYTES, build_state, encoded, normalize_run, sanitize
+from trace_variance_analyzer import cli, jev, judge
+from trace_variance_analyzer.ingest import detect_format, parse_claude, parse_codex_exec, parse_codex_rollout
+from trace_variance_analyzer.metrics import auroc
+from trace_variance_analyzer.state import BOUNDED_STATE_BYTES, build_state, encoded, normalize_run, sanitize
 
 EX = os.path.join(os.path.dirname(__file__), "..", "examples")
 with open(os.path.join(EX, "task.md"), encoding="utf-8") as _f:

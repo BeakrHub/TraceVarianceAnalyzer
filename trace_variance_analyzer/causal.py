@@ -44,7 +44,7 @@ def _np():
     try:
         import numpy
     except ImportError:
-        raise SystemExit('`onerun generate` needs numpy: pip install ".[generate]" (or pip install numpy).')
+        raise SystemExit('`tva generate` needs numpy: pip install ".[generate]" (or pip install numpy).')
     return numpy
 
 

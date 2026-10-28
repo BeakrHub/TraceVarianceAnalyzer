@@ -3,8 +3,8 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "one-run-no-key"
-version = "0.1.0"
+name = "trace-variance-analyzer"
+version = "0.2.0"
 description = "Score AI agent runs for likely failure from one run, with no answer key, using one JEV read."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -18,7 +18,8 @@ generate = ["numpy>=1.17"]
 Homepage = "https://github.com/BeakrHub/TraceVarianceAnalyzer"
 
 [project.scripts]
-onerun = "onerun.cli:main"
+trace-variance-analyzer = "trace_variance_analyzer.cli:main"
+tva = "trace_variance_analyzer.cli:main"
 
 [tool.setuptools]
-packages = ["onerun"]
+packages = ["trace_variance_analyzer"]

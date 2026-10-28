@@ -1,5 +1,5 @@
 {
-  "about": "Headline numbers from the post 'One run, no answer key' (26 Oct 2026). Solvers at low effort. AUROC is computed only within each benchmark (real tasks) or within each generator family (generated tasks). JEV = jev-1.13.0 reading one finished run with the completed_grade question in onerun/jev.py; judge = gpt-6-sol at low effort with the prompt in onerun/judge.py.",
+  "about": "Headline numbers from the post 'One run, no answer key' (26 Oct 2026). Solvers at low effort. AUROC is computed only within each benchmark (real tasks) or within each generator family (generated tasks). JEV = jev-1.13.0 reading one finished run with the completed_grade question in trace_variance_analyzer/jev.py; judge = gpt-6-sol at low effort with the prompt in trace_variance_analyzer/judge.py.",
   "disagreement_precision": {
     "about": "Share of pairs with at least one wrong run, split by the judge's call.",
     "rows": [
