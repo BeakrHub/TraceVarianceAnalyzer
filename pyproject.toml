@@ -11,8 +11,11 @@ requires-python = ">=3.9"
 license = {text = "MIT"}
 dependencies = []
 
+[project.optional-dependencies]
+generate = ["numpy>=1.17"]
+
 [project.urls]
-Homepage = "https://github.com/BeakrHub/one-run-no-key"
+Homepage = "https://github.com/BeakrHub/TraceVarianceAnalyzer"
 
 [project.scripts]
 onerun = "onerun.cli:main"

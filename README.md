@@ -30,10 +30,12 @@ Use the score to **rank** runs (review the riskiest first), not as a pass/fail c
 Python 3.9 or later, no dependencies. Installing is optional: from the repo folder, `python3 -m onerun <command>` works as is.
 
 ```bash
-git clone https://github.com/BeakrHub/one-run-no-key.git && cd one-run-no-key
+git clone https://github.com/BeakrHub/TraceVarianceAnalyzer.git && cd TraceVarianceAnalyzer
 python3 -m pip install --upgrade pip   # macOS's built-in Python 3.9 ships a pip too old for -e
 python3 -m pip install -e .            # gives you the `onerun` command
 ```
+
+Only `onerun generate` ([section 5](#5-try-it-on-tasks-with-a-known-answer)) needs a dependency, numpy: `python3 -m pip install -e ".[generate]"`.
 
 On Windows, use `python` for `python3`, and `set` (cmd) or `$env:NAME = "..."` (PowerShell) for `export`.
 
@@ -240,13 +242,57 @@ Scores are compared only **within each group**. Pooling benchmarks rewards a det
 
 A few dozen failing runs give a usable number. If JEV isn't clearly above 0.5 on your sample, don't rely on it for those tasks. It catches failures that leave a trace (contradictions, guesses, broken constraints), and it can't see problems whose evidence was never printed.
 
+No labelled sample yet? Section 5 makes tasks with a known answer.
+
+## 5. Try it on tasks with a known answer
+
+`generate` makes the synthetic causal-inference tasks from the post, where we planted the answer. Each hands the agent 16,384 rows on eight attributes and asks for the effect of a program. A hidden three-way interaction drives both who gets the program and the outcome: the product of three attributes ("smooth") or of their signs ("thresholded"). The other five attributes are distractors. Every other hard task has a matched control with the same outcome but random allocation, so a failure on the hard task points at the hidden confounding, not at the data.
+
+```bash
+python3 -m pip install -e ".[generate]"   # numpy
+onerun generate -o causal --n 4           # 8 hard tasks + 4 controls; the default seed gives the post's tasks
+```
+
+This writes:
+
+- **`causal/tasks/<task_id>/`**: `observations.csv`, `study_design.txt` and `task.md` (the prompt). The folder is all the agent needs.
+- **`causal/tasks.tsv`**: task id, group and folder, one task per line.
+- **`causal/answers.jsonl`**: the planted effects. **Keep it where the agent can't read it.** An agent with a shell can read anything on the machine, so run it on a copy of the task folder in a container or on another machine, and check the traces for reads outside its folder.
+
+Before a task is written it must pass three checks. Two estimators that know the hidden structure must recover the planted effect within 0.10. For hard tasks, a plain linear regression on all eight attributes must miss it by more than 0.40. Tasks that fail are recorded in `answers.jsonl` as rejected and not written. With `--n 16` and the default seed you get the post's 32 hard tasks and 16 controls: the same ids and the same data, byte for byte.
+
+Run your agent twice on each task, ingest each log with its task's id and group, then grade:
+
+```bash
+mkdir -p logs
+while IFS=$'\t' read -r id group dir; do
+  for rep in 1 2; do
+    (cd "$dir" && claude -p "$(cat task.md)" --output-format stream-json --verbose \
+        --model claude-opus-5-5 --effort low --allowedTools "Bash,Read,Write") > "logs/$id.$rep.jsonl"
+    onerun ingest "logs/$id.$rep.jsonl" --task-file "$dir/task.md" --task-id "$id" --group "$group" \
+        -o causal/runs.jsonl
+  done
+done < causal/tasks.tsv
+
+onerun grade causal/runs.jsonl --answers causal/answers.jsonl -o causal/labels.jsonl
+onerun score causal/runs.jsonl -o causal/scores.jsonl
+onerun pair causal/runs.jsonl --scores causal/scores.jsonl -o causal/pairs.jsonl   # optional
+onerun evaluate --scores causal/scores.jsonl --labels causal/labels.jsonl --pairs causal/pairs.jsonl
+```
+
+- **Pass `--task-id` and `--group` at ingest.** Every task has the same prompt, so without `--task-id` all runs would share one id. The groups (`causal-smooth`, `causal-thresholded`, plus `-control` for the controls) keep evaluation within a flavour, as in the post.
+- **Grading reads only a final `Effect: <number>` line,** which the prompt asks for. An estimate more than 0.20 from the planted effect is wrong. Runs without the line are listed and left ungraded: read their estimates yourself and pass them with `--estimates`.
+- **The post's exact prompt** had no `Effect:` line; its runs were read by people and LLMs. `--study-prompt` restores it, and grading then needs `--estimates`.
+- **What we saw.** With the post's prompt, Claude Opus 5.5 at low effort got 75 of 192 hard runs wrong (28 of 32 tasks failed at least once in six runs) and 0 of 96 control runs. GPT-6 Sol and GPT-6 Astra at high effort solved all 32 hard tasks. When both runs agreed and were wrong, the answers were mostly near misses that shrank the effect toward zero: two runs that undershoot alike look like agreement, so the judge can't see them and JEV has to. Other models may find these tasks easy. Treat them as a test bed for a detector, not a benchmark.
+- **Cost:** generating is free and writes about 3 MB per task. The agent runs, `score` and `pair` cost what they usually do.
+
 ## Results from the post
 
 | | |
 |---|---|
 | ![When two runs disagree, at least one is wrong 73 to 100% of the time](docs/img/ask_twice.png) | ![On new tasks, effort signals and trained classifiers flipped; JEV held](docs/img/signals_flip.png) |
 
-The generated test tasks are synthetic causal-inference problems with a planted answer. GPT-6 Sol and GPT-6 Astra at high effort solved all 32 hard ones. Claude Opus 5.5 at low effort got 75 of 192 hard runs wrong and 0 of 96 control runs.
+The generated test tasks are synthetic causal-inference problems with a planted answer ([section 5](#5-try-it-on-tasks-with-a-known-answer) makes them). GPT-6 Sol and GPT-6 Astra at high effort solved all 32 hard ones. Claude Opus 5.5 at low effort got 75 of 192 hard runs wrong and 0 of 96 control runs.
 
 ![The loop: generate, run once, score with JEV, confirm, climb](docs/img/loop.png)
 
@@ -269,7 +315,7 @@ The generated test tasks are synthetic causal-inference problems with a planted 
 ## Development
 
 ```bash
-python3 -m unittest        # offline tests, no keys or network
+python3 -m unittest        # offline tests, no keys or network; the generate tests skip without numpy
 ```
 
 ## License
