@@ -1,4 +1,5 @@
-"""onerun: ingest agent logs, score each run with one JEV read, optionally compare two runs, evaluate."""
+"""onerun: ingest agent logs, score each run with one JEV read, optionally compare two runs, evaluate.
+Also generates test tasks with a planted answer, and grades runs of them."""
 import argparse
 import glob
 import json
@@ -9,7 +10,7 @@ import time
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from . import __version__, jev, judge
+from . import __version__, causal, jev, judge
 from .ingest import PARSERS, detect_format
 from .metrics import auroc, bootstrap
 from .state import build_state, encoded, normalize_run
@@ -321,6 +322,74 @@ def cmd_evaluate(a):
             json.dump(report, f, indent=1)
 
 
+# -------------------------------------------------------------------------- generate
+def cmd_generate(a):
+    answers = os.path.join(a.out, "answers.jsonl")
+    if os.path.exists(answers):
+        sys.exit(f"{answers} already exists. Generated tasks are never overwritten; choose a new folder.")
+    flavours = [f.strip() for f in a.flavours.split(",") if f.strip()]
+    if not flavours or any(f not in causal.FLAVOURS for f in flavours):
+        sys.exit(f"--flavours must be a comma-separated subset of {','.join(causal.FLAVOURS)}.")
+    prompt = causal.STUDY_PROMPT if a.study_prompt else causal.PROMPT
+    rows, listed = [], []
+    for spec in causal.plan(a.n, a.seed, flavours, controls=not a.no_controls):
+        X, program, outcome = causal.simulate(spec)
+        checks = causal.check(spec, X, program, outcome)
+        folder = os.path.join(a.out, "tasks", spec["task_id"])
+        if checks["accepted"]:
+            causal.write_task(folder, spec, X, program, outcome, prompt)
+            listed.append(f"{spec['task_id']}\t{spec['group']}\t{folder}\n")
+        rows.append({**spec, "accepted": checks["accepted"], "checks": checks,
+                     "prompt": "study" if a.study_prompt else "effect_line"})
+        print(f"{spec['task_id']}  {spec['group']:<26} {'ok' if checks['accepted'] else 'rejected by the checks'}")
+    with open(answers, "w", encoding="utf-8") as f:
+        f.writelines(json.dumps(r) + "\n" for r in rows)
+    with open(os.path.join(a.out, "tasks.tsv"), "w", encoding="utf-8") as f:
+        f.writelines(listed)
+    print(f"Wrote {len(listed)} tasks to {os.path.join(a.out, 'tasks')} ({len(rows) - len(listed)} rejected), "
+          f"and the list to {os.path.join(a.out, 'tasks.tsv')}.\nThe planted answers are in {answers}: keep it "
+          "where the agent can't read it.")
+
+
+# ----------------------------------------------------------------------------- grade
+def cmd_grade(a):
+    answers = causal.load_answers(a.answers)
+    manual = {r["run_id"]: float(r["estimate"]) for r in read_jsonl(a.estimates, required=True)} if a.estimates else {}
+    labels, unread, other, regrouped = [], [], 0, 0
+    for r in latest_by(read_jsonl(a.runs, required=True), lambda r: r.get("run_id")):
+        key = answers.get(r.get("task_id"))
+        if key is None:
+            other += 1
+            continue
+        try:
+            answer = normalize_run(r)["answer"]
+        except (ValueError, KeyError, TypeError, AttributeError):
+            answer = ""
+        est, read = manual.get(r.get("run_id")), "manual"
+        if est is None:
+            est, read = causal.read_effect(answer), "effect_line"
+        if est is None:
+            unread.append(r.get("run_id"))
+            continue
+        regrouped += r.get("group") != key["group"]
+        labels.append({"run_id": r["run_id"], "failed": causal.grade(est, key), "task_id": key["task_id"],
+                       "group": key["group"], "estimate": est, "read": read})
+    out = Appender(a.out, truncate=True)
+    for row in labels:
+        out.write(row)
+    print(f"Wrote {a.out}: {len(labels)} runs graded, {sum(r['failed'] for r in labels)} wrong "
+          f"(more than {causal.TOLERANCE} from the planted effect).")
+    if unread:
+        print(f"{len(unread)} runs have no `Effect: <number>` line, so they are not graded: "
+              f"{', '.join(map(str, unread[:10]))}{' ...' if len(unread) > 10 else ''}\n"
+              'Read their estimates yourself and pass them with --estimates (JSONL of {"run_id", "estimate"}).')
+    if regrouped:
+        print(f"{regrouped} graded runs were ingested with a group other than their task's (see tasks.tsv). "
+              "evaluate compares runs within the group recorded at ingest, so re-ingest them with --group.")
+    if other:
+        print(f"{other} runs are not of generated tasks (their task_id is not in {a.answers}); skipped.")
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="onerun", description=__doc__)
     ap.add_argument("--version", action="version", version="%(prog)s " + __version__)
@@ -369,6 +438,23 @@ def main(argv=None):
     p.add_argument("--bootstrap", type=int, default=1000, help="resamples for the interval (0 = none)")
     p.add_argument("--json", help="also write the numbers to this file")
     p.set_defaults(fn=cmd_evaluate)
+
+    p = sub.add_parser("generate", help="make causal-inference test tasks with a planted answer (needs numpy)")
+    p.add_argument("-o", "--out", required=True, help="new folder for tasks/, tasks.tsv and answers.jsonl")
+    p.add_argument("--n", type=int, default=4, help="hard tasks per flavour (the post used 16)")
+    p.add_argument("--seed", type=int, default=causal.STUDY_SEED, help="the default regenerates the post's tasks")
+    p.add_argument("--flavours", default=",".join(causal.FLAVOURS))
+    p.add_argument("--no-controls", action="store_true", help="skip the matched random-allocation controls")
+    p.add_argument("--study-prompt", action="store_true",
+                   help="the post's exact prompt, which has no `Effect:` line (grade then needs --estimates)")
+    p.set_defaults(fn=cmd_generate)
+
+    p = sub.add_parser("grade", help="label runs of generated tasks against their planted answers")
+    p.add_argument("runs")
+    p.add_argument("--answers", required=True, help="answers.jsonl from generate")
+    p.add_argument("-o", "--out", required=True, help="labels JSONL for evaluate (overwritten)")
+    p.add_argument("--estimates", help='JSONL of {"run_id": ..., "estimate": ...} read by hand; overrides the Effect: line')
+    p.set_defaults(fn=cmd_grade)
 
     a = ap.parse_args(argv)
     a.fn(a)
