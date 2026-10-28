@@ -1,4 +1,4 @@
-"""onerun: ingest agent logs, score each run with one JEV read, optionally compare two runs, evaluate.
+"""tva (trace-variance-analyzer): ingest agent logs, score each run with one JEV read, optionally compare two runs, evaluate.
 Also generates test tasks with a planted answer, and grades runs of them."""
 import argparse
 import glob
@@ -391,7 +391,7 @@ def cmd_grade(a):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(prog="onerun", description=__doc__)
+    ap = argparse.ArgumentParser(prog="tva", description=__doc__)
     ap.add_argument("--version", action="version", version="%(prog)s " + __version__)
     sub = ap.add_subparsers(dest="cmd", required=True)
 

@@ -27,15 +27,15 @@ Use the score to **rank** runs (review the riskiest first), not as a pass/fail c
 
 ## Install
 
-Python 3.9 or later, no dependencies. Installing is optional: from the repo folder, `python3 -m onerun <command>` works as is.
+Python 3.9 or later, no dependencies. Installing is optional: from the repo folder, `python3 -m trace_variance_analyzer <command>` works as is.
 
 ```bash
 git clone https://github.com/BeakrHub/TraceVarianceAnalyzer.git && cd TraceVarianceAnalyzer
 python3 -m pip install --upgrade pip   # macOS's built-in Python 3.9 ships a pip too old for -e
-python3 -m pip install -e .            # gives you the `onerun` command
+python3 -m pip install -e .            # gives you the `tva` command (long name: trace-variance-analyzer)
 ```
 
-Only `onerun generate` ([section 5](#5-try-it-on-tasks-with-a-known-answer)) needs a dependency, numpy: `python3 -m pip install -e ".[generate]"`.
+Only `tva generate` ([section 5](#5-try-it-on-tasks-with-a-known-answer)) needs a dependency, numpy: `python3 -m pip install -e ".[generate]"`.
 
 On Windows, use `python` for `python3`, and `set` (cmd) or `$env:NAME = "..."` (PowerShell) for `export`.
 
@@ -43,8 +43,8 @@ You need:
 
 | Key | Used by | Where to get it |
 |---|---|---|
-| `TYPESAFE_API_KEY` | `onerun score` | TypeSafe ([docs](https://docs.typesafe.ai)); access may require a request |
-| `OPENAI_API_KEY` | `onerun pair` only | OpenAI. `OPENAI_BASE_URL` works for gateways that serve the Responses API (`/responses`) |
+| `TYPESAFE_API_KEY` | `tva score` | TypeSafe ([docs](https://docs.typesafe.ai)); access may require a request |
+| `OPENAI_API_KEY` | `tva pair` only | OpenAI. `OPENAI_BASE_URL` works for gateways that serve the Responses API (`/responses`) |
 
 Optional: set `TYPESAFE_BASE_URL` (default `https://api.typesafe.ai/v1`) to send JEV requests through a gateway that serves the same API.
 
@@ -54,26 +54,26 @@ Keys are read from the environment only. Nothing is written to disk except your 
 
 ```bash
 # 1. No keys needed: evaluate the synthetic demo data to see the output format
-onerun evaluate --scores examples/demo_scores.jsonl --labels examples/demo_labels.jsonl \
+tva evaluate --scores examples/demo_scores.jsonl --labels examples/demo_labels.jsonl \
     --pairs examples/demo_pairs.jsonl
 
 # 2. Ingest the two example logs (one Codex, one Claude Code run of the same task)
-onerun ingest examples/codex_exec_stream.jsonl examples/claude_stream.jsonl \
+tva ingest examples/codex_exec_stream.jsonl examples/claude_stream.jsonl \
     --task-file examples/task.md -o runs/runs.jsonl
 
 # 3. See exactly what would be sent to JEV, without sending anything
-onerun score runs/runs.jsonl -o runs/scores.jsonl --dry-run runs/requests.jsonl
+tva score runs/runs.jsonl -o runs/scores.jsonl --dry-run runs/requests.jsonl
 
 # 4. Score for real
 export TYPESAFE_API_KEY=...
-onerun score runs/runs.jsonl -o runs/scores.jsonl
+tva score runs/runs.jsonl -o runs/scores.jsonl
 ```
 
 The example logs are hand-written, to show the formats. They are not real runs.
 
 ## 1. Capture traces
 
-A trace needs three things: **the task**, the **visible steps** (assistant messages, tool calls and tool outputs) and the **final answer**. `onerun` always drops hidden reasoning (Codex reasoning items, Claude thinking blocks). JEV judges only what a reviewer could see. Common tool names are mapped to a small shared vocabulary (`shell.execute`, `file.read`, `file.edit`, `web.search`, ...), so traces from different agents look alike to JEV.
+A trace needs three things: **the task**, the **visible steps** (assistant messages, tool calls and tool outputs) and the **final answer**. `tva` always drops hidden reasoning (Codex reasoning items, Claude thinking blocks). JEV judges only what a reviewer could see. Common tool names are mapped to a small shared vocabulary (`shell.execute`, `file.read`, `file.edit`, `web.search`, ...), so traces from different agents look alike to JEV.
 
 ### Codex CLI
 
@@ -84,7 +84,7 @@ mkdir -p logs
 codex exec --json -m gpt-5.5 -c model_reasoning_effort=low --skip-git-repo-check \
     "$(cat task.md)" > logs/task1.codex.jsonl
 
-onerun ingest logs/task1.codex.jsonl --task-file task.md \
+tva ingest logs/task1.codex.jsonl --task-file task.md \
     --agent-model gpt-5.5 --effort low --group my-benchmark -o runs/runs.jsonl
 ```
 
@@ -96,12 +96,12 @@ onerun ingest logs/task1.codex.jsonl --task-file task.md \
 **Runs you already have.** Codex saves each session under `$CODEX_HOME` (default `~/.codex`) as `sessions/YYYY/MM/DD/rollout-*.jsonl`:
 
 ```bash
-onerun ingest "~/.codex/sessions/2026/10/**/rollout-*.jsonl" -o runs/history.jsonl
+tva ingest "~/.codex/sessions/2026/10/**/rollout-*.jsonl" -o runs/history.jsonl
 ```
 
-Quoting the pattern lets `onerun` expand it, which also works on Windows and with thousands of files.
+Quoting the pattern lets `tva` expand it, which also works on Windows and with thousands of files.
 
-- **The task** is the first prompt you typed. Injected context, such as the environment block, AGENTS.md, and the browser and plugin blocks newer versions add, is skipped. If your setup injects other tagged blocks, add their tags to `INJECTED_BLOCK` in [`onerun/ingest.py`](onerun/ingest.py).
+- **The task** is the first prompt you typed. Injected context, such as the environment block, AGENTS.md, and the browser and plugin blocks newer versions add, is skipped. If your setup injects other tagged blocks, add their tags to `INJECTED_BLOCK` in [`trace_variance_analyzer/ingest.py`](trace_variance_analyzer/ingest.py).
 - **Subagent sessions** (Codex's reviewer and spawned agents) are skipped. Their parent session already contains the call and its result.
 - **Resumed sessions** keep their id, so a second file of the same session is skipped as a duplicate. Ingest the newest file.
 - **Unusual sessions:** if the task comes out wrong, pass `--task` yourself.
@@ -116,7 +116,7 @@ claude -p "$(cat task.md)" --output-format stream-json --verbose \
     --model claude-opus-5-5 --effort low --allowedTools "Bash,Read,Edit,Write" \
     > logs/task1.claude.jsonl
 
-onerun ingest logs/task1.claude.jsonl --task-file task.md --group my-benchmark -o runs/runs.jsonl
+tva ingest logs/task1.claude.jsonl --task-file task.md --group my-benchmark -o runs/runs.jsonl
 ```
 
 - **Permissions:** in `-p` mode, a tool call that needs approval is denied unless something allows it. Use `--allowedTools` or `--permission-mode` (for example `acceptEdits`), or the agent may stall on its first command.
@@ -127,7 +127,7 @@ onerun ingest logs/task1.claude.jsonl --task-file task.md --group my-benchmark -
 **Runs you already have.** Claude Code saves every session as a transcript in `~/.claude/projects/<project>/<session-id>.jsonl`:
 
 ```bash
-onerun ingest ~/.claude/projects/-Users-me-myproject/*.jsonl -o runs/history.jsonl
+tva ingest ~/.claude/projects/-Users-me-myproject/*.jsonl -o runs/history.jsonl
 ```
 
 - **Retention:** transcripts are deleted after **30 days** by default. To keep more history, raise `cleanupPeriodDays` in `~/.claude/settings.json`:
@@ -159,8 +159,8 @@ The minimum is `run_id`, `task` and `answer` (or `steps` ending in the answer). 
 To use it from your own code instead of the CLI:
 
 ```python
-from onerun import jev
-from onerun.state import build_state
+from trace_variance_analyzer import jev
+from trace_variance_analyzer.state import build_state
 
 state, view, redactions, final_ok = build_state({"task": task, "steps": steps, "answer": answer})
 raw = jev.http_json(jev.ENDPOINT, api_key, jev.request_body(jev.DEFAULT_MODEL, state))
@@ -199,7 +199,7 @@ Codex emits `codex.api_request`, `codex.tool_decision` and `codex.tool_result` (
 ## 2. Score
 
 ```bash
-onerun score runs/runs.jsonl -o runs/scores.jsonl
+tva score runs/runs.jsonl -o runs/scores.jsonl
 ```
 
 For each run, `score` does five things:
@@ -207,7 +207,7 @@ For each run, `score` does five things:
 - **Builds what JEV sees:** the task, the solver's model and effort, and the visible history ending with the final answer.
 - **Redacts likely secrets** (API keys, emails, UUIDs, local file paths), and drops any field named like an answer key. This is best effort; check a `--dry-run` before sending sensitive traces.
 - **Trims long traces.** If a trace is over 44 KB, it keeps the task, the most recent history and the final answer, clips any event over 4 KB to its beginning and end, and tells JEV what was omitted. These are the exact rules used in the study. A final answer over 4 KB is clipped too (the row says `final_answer_excerpted`), and if the task alone nearly fills the budget the answer may not fit at all (`final_answer_present: false`); treat those scores with care.
-- **Asks JEV one fixed question.** The question is `completed_grade` in [`onerun/jev.py`](onerun/jev.py), with choices correct, partial, incorrect and refusal/error. The default model is `jev-latest`. The post's numbers were measured with `jev-1.13.0`, which TypeSafe no longer serves, so your scores come from a newer version; every row records the version it resolved to (`resolved_model`). Run `evaluate` on your own labelled sample before relying on them. A reworded question is a different instrument.
+- **Asks JEV one fixed question.** The question is `completed_grade` in [`trace_variance_analyzer/jev.py`](trace_variance_analyzer/jev.py), with choices correct, partial, incorrect and refusal/error. The default model is `jev-latest`. The post's numbers were measured with `jev-1.13.0`, which TypeSafe no longer serves, so your scores come from a newer version; every row records the version it resolved to (`resolved_model`). Run `evaluate` on your own labelled sample before relying on them. A reworded question is a different instrument.
 - **Writes one line per run,** for example `{"run_id", "risk", "p_correct", "p_partial", "p_incorrect", "p_refusal_error", "view", ...}`. Higher `risk` means more likely wrong.
 
 **Cost and speed.** About $0.00015 and a quarter of a second per run. `score` prints an estimate first and stops above `--max-cost` (default $1) unless you pass `--yes`. Four runs go in parallel. Rerunning skips finished runs (including ones JEV declined to grade) and retries errors. A run that can't be read is recorded as `invalid_run` and the rest carry on.
@@ -216,10 +216,10 @@ For each run, `score` does five things:
 
 ```bash
 export OPENAI_API_KEY=...
-onerun pair runs/runs.jsonl --scores runs/scores.jsonl -o runs/pairs.jsonl
+tva pair runs/runs.jsonl --scores runs/scores.jsonl -o runs/pairs.jsonl
 ```
 
-For each task with two runs, an LLM judge (`gpt-6-sol` at low effort, about $0.0054 per pair) reads both final answers and says whether their conclusions agree. It quotes each answer as evidence; a quote that isn't really there voids the verdict. The prompt is in [`onerun/judge.py`](onerun/judge.py).
+For each task with two runs, an LLM judge (`gpt-6-sol` at low effort, about $0.0054 per pair) reads both final answers and says whether their conclusions agree. It quotes each answer as evidence; a quote that isn't really there voids the verdict. The prompt is in [`trace_variance_analyzer/judge.py`](trace_variance_analyzer/judge.py).
 
 - **Disagreeing pairs** are your strongest leads. In our data, at least one run was wrong in 73 to 100% of them.
 - **Agreeing pairs** are listed by JEV risk. The top of that list is where to look for failures that a second run would never reveal.
@@ -229,7 +229,7 @@ For each task with two runs, an LLM judge (`gpt-6-sol` at low effort, about $0.0
 Label a sample: re-grade it, or check it against a key you have. Then:
 
 ```bash
-onerun evaluate --scores runs/scores.jsonl --labels labels.jsonl --pairs runs/pairs.jsonl
+tva evaluate --scores runs/scores.jsonl --labels labels.jsonl --pairs runs/pairs.jsonl
 ```
 
 `labels.jsonl` has one line per run: `{"run_id": "r1", "failed": true}`. The report gives AUROC with a 95% interval, from resampling tasks (`--bootstrap 0` skips the interval on very large files):
@@ -250,7 +250,7 @@ No labelled sample yet? Section 5 makes tasks with a known answer.
 
 ```bash
 python3 -m pip install -e ".[generate]"   # numpy
-onerun generate -o causal --n 4           # 8 hard tasks + 4 controls; the default seed gives the post's tasks
+tva generate -o causal --n 4           # 8 hard tasks + 4 controls; the default seed gives the post's tasks
 ```
 
 This writes:
@@ -268,18 +268,20 @@ mkdir -p logs
 while IFS=$'\t' read -r id group dir; do
   for rep in 1 2; do
     (cd "$dir" && claude -p "$(cat task.md)" --output-format stream-json --verbose \
-        --model claude-opus-5-5 --effort low --allowedTools "Bash,Read,Write") > "logs/$id.$rep.jsonl"
-    onerun ingest "logs/$id.$rep.jsonl" --task-file "$dir/task.md" --task-id "$id" --group "$group" \
+        --model claude-opus-5-5 --effort low --allowedTools "Bash,Read,Write" \
+        --disallowedTools "WebSearch,WebFetch") > "logs/$id.$rep.jsonl"
+    tva ingest "logs/$id.$rep.jsonl" --task-file "$dir/task.md" --task-id "$id" --group "$group" \
         -o causal/runs.jsonl
   done
 done < causal/tasks.tsv
 
-onerun grade causal/runs.jsonl --answers causal/answers.jsonl -o causal/labels.jsonl
-onerun score causal/runs.jsonl -o causal/scores.jsonl
-onerun pair causal/runs.jsonl --scores causal/scores.jsonl -o causal/pairs.jsonl   # optional
-onerun evaluate --scores causal/scores.jsonl --labels causal/labels.jsonl --pairs causal/pairs.jsonl
+tva grade causal/runs.jsonl --answers causal/answers.jsonl -o causal/labels.jsonl
+tva score causal/runs.jsonl -o causal/scores.jsonl
+tva pair causal/runs.jsonl --scores causal/scores.jsonl -o causal/pairs.jsonl   # optional
+tva evaluate --scores causal/scores.jsonl --labels causal/labels.jsonl --pairs causal/pairs.jsonl
 ```
 
+- **Match the post's setup** if you want comparable numbers: no web, and a `python3` on the agent's `PATH` with numpy, pandas and scikit-learn. Without them the agent spends its effort installing packages or hand-writing estimators, which is a different task.
 - **Pass `--task-id` and `--group` at ingest.** Every task has the same prompt, so without `--task-id` all runs would share one id. The groups (`causal-smooth`, `causal-thresholded`, plus `-control` for the controls) keep evaluation within a flavour, as in the post.
 - **Grading reads only a final `Effect: <number>` line,** which the prompt asks for. An estimate more than 0.20 from the planted effect is wrong. Runs without the line are listed and left ungraded: read their estimates yourself and pass them with `--estimates`.
 - **The post's exact prompt** had no `Effect:` line; its runs were read by people and LLMs. `--study-prompt` restores it, and grading then needs `--estimates`.
